@@ -16,5 +16,5 @@ def research(self,**kwarg_):
   </ul>
 <div style='clear:both'></div>
 ''')
- elif re.search(r'^research\/pyscriptoffline$',kwarg_['path'],flags=re.I):
-  return re.sub(r'http://minhinc.42web.io',kwarg_['imageurl'],open(self.cwd+'/static/pyscriptoffline.html').read(),flags=re.DOTALL)
+ elif re.search(r'^research\/\w+([.]html)?$',kwarg_['path'],flags=re.I):
+  return re.sub(r'http://minhinc.42web.io',kwarg_['imageurl'],open(self.cwd+re.sub(r'^research',r'/static',kwarg_['path'])+('.html' if not re.search(r'[.]html$',kwarg_['path'],flags=re.I) else '')).read(),flags=re.DOTALL)
