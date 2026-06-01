@@ -32,11 +32,11 @@ def header(self,**kwarg_):
  <link rel='icon' type='image/png' href='{kwarg_['imageurl']}/image/favicon-32x32.png' sizes='32x32'>
  <link rel='icon' type='image/png' href='{kwarg_['imageurl']}/image/favicon-48x48.png' sizes='48x48'>
  <title>{'Minh, Inc. Software development and Outsourcing Bangalore India' if re.search("r'^"+chr(92)+"s*$'",kwarg_['path'],flags=re.I) else kwarg_['path']+'| Minh, Inc. Bangalore India'}</title>
- <link rel='stylesheet' type='text/css' href='/static/css/{"main" if not kwarg_['mobile'] else "main_m"}.css' media='all' onload='checkAndReveal()'/>
- <link rel='stylesheet' type='text/css' href='/static/css/{"agenda" if not kwarg_['mobile'] else "agenda_m"}.css' media='all' onload='checkAndReveal()'/>
- <link rel='stylesheet' type='text/css' href='/static/css/custom.css' media='all' onload='checkAndReveal()'/>
- <script type='module' src='{"/static/pyscript/core.js" if not re.search('minhinc.onrender.com',kwarg_['renderurl'],flags=re.I) else "https://pyscript.net/releases/2026.3.1/core.js"}'></script>
- <link rel='stylesheet' href='{"/static/pyscript/core.css" if not re.search('minhinc.onrender.com',kwarg_['renderurl'],flags=re.I) else "https://pyscript.net/releases/2026.3.1/core.css"}'>
+ <link rel='stylesheet' type='text/css' href='{kwarg_['staticdir']}/css/{"main" if not kwarg_['mobile'] else "main_m"}.css' media='all' onload='checkAndReveal()'/>
+ <link rel='stylesheet' type='text/css' href='{kwarg_['staticdir']}/css/{"agenda" if not kwarg_['mobile'] else "agenda_m"}.css' media='all' onload='checkAndReveal()'/>
+ <link rel='stylesheet' type='text/css' href='{kwarg_['staticdir']}/css/custom.css' media='all' onload='checkAndReveal()'/>
+ <script type='module' src='{"/static/pyscript/core.js" if kwarg_['local'] else "https://pyscript.net/releases/2026.3.1/core.js"}'></script>
+ <link rel='stylesheet' href='{"/static/pyscript/core.css" if kwarg_['local'] else "https://pyscript.net/releases/2026.3.1/core.css"}'>
 </head>
 <body>''' + (f''' <a href={kwarg_['staticurl']}><img src='{kwarg_['imageurl']}/image/topconLogo.png'/></a>
  <br>

@@ -64,7 +64,7 @@ def uploadcv(self, **kwarg_):
  </ul>
 <div class="clr"></div>
 ''')+f'''
-<script type="mpy" config='{{"interpreter":"/static/micropython/micropython.mjs"}}' src="/static/pyscriptevent.py">
+<script type="mpy" {"""config='{{"interpreter":"/static/micropython/micropython.mjs"}}'""" if kwarg['local'] else ''} src="/static/pyscriptevent.py">
 </script>
 '''
 
@@ -114,7 +114,7 @@ width:359px;
  </li>
 </ul>
 <div style="clear:both"></div>"""}
-<script type="mpy" config='{{"interpreter":"/static/micropython/micropython.mjs"}}' src="/static/pyscriptevent.py">
+<script type="mpy" {"""config='{{"interpreter":"/static/micropython/micropython.mjs"}}'""" if kwarg['local'] else ''} src="/static/pyscriptevent.py">
 </script>'''
 
 def online(self, **kwarg_):
@@ -143,7 +143,7 @@ def online(self, **kwarg_):
 </form>
 <a href='{kwarg_['staticurl']}/training/py'><img style='float:left;width:34%' src='http://minhinc.42web.io/image/pytraininglogo.gif'></img></a>
 <div style='clear:both'></div>
-<script type="mpy" config='{{"interpreter":"/static/micropython/micropython.mjs"}}' src="/static/pyscriptevent.py">
+<script type="mpy" {"""config='{{"interpreter":"/static/micropython/micropython.mjs"}}'""" if kwarg['local'] else ''} src="/static/pyscriptevent.py">
 </script>'''
 
 def about(self, **kwarg_):
