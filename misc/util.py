@@ -1,4 +1,4 @@
-import os,re
+import os,re,isodate
 import requests
 import datetime
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -155,3 +155,110 @@ class utilc:
 {chr(10).join(["<li class='current'><p class='padtop'>"+self.gjf(self.jsoni[kwarg_['topic']]['data'][ii],'title')+"</p></li>" if self.gjf(self.jsoni[kwarg_['topic']]['data'][ii],'abbreviation')==kwarg_['subtopic'] else "<a href='"+kwarg_['staticurl']+"/"+kwarg_['topic']+"/"+self.gjf(self.jsoni[kwarg_['topic']]['data'][ii],'abbreviation')+"'><li class='"+['light','dark'][ii%2]+"'><p>"+self.gjf(self.jsoni[kwarg_['topic']]['data'][ii],'title')+"</p></li></a>" for ii in range(len(self.jsoni[kwarg_['topic']]['data']))])}
  </ul>
 </div>'''
+
+ def maxhourlinkyoutube(self, **kwarg_):
+  if not hasattr(utilc.maxhourlinkyoutube,'videos'):
+   utilc.maxhourlinkyoutube.videos=[]
+  if not utilc.maxhourlinkyoutube.videos:
+   API_KEY = os.getenv("YOUTUBE_API_KEY")
+   CHANNEL_HANDLE = "@minhinc"
+   if not API_KEY:
+       raise RuntimeError("YOUTUBE_API_KEY environment variable not found")
+   # ============================================================
+   # 1. Get Channel ID and Uploads Playlist ID
+   # ============================================================
+   url = "https://www.googleapis.com/youtube/v3/channels"
+   params = {
+       "part": "snippet,contentDetails,statistics",
+       "forHandle": CHANNEL_HANDLE,
+       "key": API_KEY
+   }
+   response = requests.get(url, params=params)
+   response.raise_for_status()
+   data = response.json()
+   if not data.get("items"):
+    raise RuntimeError("YouTube channel not found")
+   channel = data["items"][0]
+   channel_id = channel["id"]
+   channel_title = channel["snippet"]["title"]
+   subscriber_count = channel["statistics"].get(
+       "subscriberCount", "0"
+   )
+   uploads_playlist_id = (
+       channel["contentDetails"]
+       ["relatedPlaylists"]
+       ["uploads"]
+   )
+   print("Channel       :", channel_title)
+   print("Channel ID    :", channel_id)
+   print("Subscribers   :", subscriber_count)
+   print("Uploads ID    :", uploads_playlist_id)
+   # ============================================================
+   # 2. Get ALL video IDs from Uploads Playlist
+   # ============================================================
+   video_ids = []
+   next_page_token = None
+   while True:
+    url = "https://www.googleapis.com/youtube/v3/playlistItems"
+    params = {
+        "part": "contentDetails",
+        "playlistId": uploads_playlist_id,
+        "maxResults": 50,
+        "key": API_KEY
+    }
+    if next_page_token:
+     params["pageToken"] = next_page_token
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    data = response.json()
+    for item in data.get("items", []):
+     video_id = item["contentDetails"]["videoId"]
+     video_ids.append(video_id)
+    next_page_token = data.get("nextPageToken")
+    if not next_page_token:
+     break
+   
+   print()
+   print("Total videos found:", len(video_ids))
+   # ============================================================
+   # 3. Get detailed information for videos
+   #
+   # YouTube accepts up to 50 video IDs in one videos.list call.
+   # ============================================================
+   #utilc.maxhourlinkyoutube.videos = []
+   for start in range(0, len(video_ids), 50):
+    batch = video_ids[start:start + 50]
+    url = "https://www.googleapis.com/youtube/v3/videos"
+    params = {
+           "part": "snippet,contentDetails,statistics",
+           "id": ",".join(batch),
+           "key": API_KEY
+       }
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    data = response.json()
+    for item in data.get("items", []):
+     duration_text = item["contentDetails"].get( "duration", "PT0S")
+     duration = isodate.parse_duration(duration_text)
+     duration_seconds = int( duration.total_seconds())
+     utilc.maxhourlinkyoutube.videos.append({
+               #"id": item["id"],
+               "title": item["snippet"]["title"],
+               "duration_seconds": duration_seconds,
+               #"duration_iso": duration_text,
+               #"thumbnail": item["snippet"]["thumbnails"]["high"]["url"],
+               "link": f"https://www.youtube.com/watch?v={item['id']}",
+               "views": item.get("statistics", {}).get("viewCount", "0")
+           })
+   # ============================================================
+   # 4. Sort ALL videos by duration
+   # ============================================================
+   utilc.maxhourlinkyoutube.videos.sort(
+       key=lambda video: video["duration_seconds"],
+       reverse=True
+   )
+   utilc.maxhourlinkyoutube.videos[50:]=[]
+  html=''
+  for number, video in enumerate(utilc.maxhourlinkyoutube.videos,start=1):
+   html+=f'<span style="font-size:7pt;font-weight:bold;">{number}.</span> <a href="{video["link"]}">{video["title"]}</a> {video["duration_seconds"]//3600:02d}:{(video["duration_seconds"]%3600)//60:02d}:{video["duration_seconds"]%60:02d} {video["views"]}</br>'
+  return html
