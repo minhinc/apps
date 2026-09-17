@@ -1,5 +1,6 @@
 import re,random
 from flask import jsonify
+import asyncio
 def randomnumsum(reset=True, _cache={}):
  if reset:
   min=1;max=300;_cache['num1']=random.randint(min,max);_cache['num2']=random.randint(min,max);_cache['sum']=_cache['num1']+_cache['num2'];
@@ -220,4 +221,4 @@ def portfolio(self,**kwarg_):
  return open(self.cwd+r'/static/portfolio.html').read()
 
 def youtube(self,**kwarg_):
- return self.utili.maxhourlinkyoutube(**kwarg_)
+ return asyncio.run(self.utili.maxhourlinkyoutube(**kwarg_))

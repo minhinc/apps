@@ -1,6 +1,12 @@
-import os,re,isodate
+import os,re
 import requests
 import datetime
+
+import asyncio
+import aiohttp
+import isodate
+import time
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -156,109 +162,89 @@ class utilc:
  </ul>
 </div>'''
 
- def maxhourlinkyoutube(self, **kwarg_):
+ async def maxhourlinkyoutube(self, **kwarg_):
   if not hasattr(utilc.maxhourlinkyoutube,'videos'):
-   utilc.maxhourlinkyoutube.videos=[]
-  if not utilc.maxhourlinkyoutube.videos:
+   utilc.maxhourlinkyoutube.final_video_data={}
+  if not utilc.maxhourlinkyoutube.final_video_data:
    API_KEY = os.getenv("YOUTUBE_API_KEY")
-   CHANNEL_HANDLE = "@minhinc"
+   CHANNEL_ID = 'UChmiKM2jr7e9iUOrVPKRTXQ' # e.g., UC_x5XG1OV2P6uZZ5FSM9Ttw
    if not API_KEY:
        raise RuntimeError("YOUTUBE_API_KEY environment variable not found")
-   # ============================================================
-   # 1. Get Channel ID and Uploads Playlist ID
-   # ============================================================
-   url = "https://www.googleapis.com/youtube/v3/channels"
-   params = {
-       "part": "snippet,contentDetails,statistics",
-       "forHandle": CHANNEL_HANDLE,
-       "key": API_KEY
-   }
-   response = requests.get(url, params=params)
-   response.raise_for_status()
-   data = response.json()
-   if not data.get("items"):
-    raise RuntimeError("YouTube channel not found")
-   channel = data["items"][0]
-   channel_id = channel["id"]
-   channel_title = channel["snippet"]["title"]
-   subscriber_count = channel["statistics"].get(
-       "subscriberCount", "0"
-   )
-   uploads_playlist_id = (
-       channel["contentDetails"]
-       ["relatedPlaylists"]
-       ["uploads"]
-   )
-   print("Channel       :", channel_title)
-   print("Channel ID    :", channel_id)
-   print("Subscribers   :", subscriber_count)
-   print("Uploads ID    :", uploads_playlist_id)
-   # ============================================================
-   # 2. Get ALL video IDs from Uploads Playlist
-   # ============================================================
+
+  async def get_uploads_playlist_id(session):
+   """Step 1: Get the hidden 'uploads' playlist ID for the channel."""
+   url = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id={CHANNEL_ID}&key={API_KEY}"
+   async with session.get(url) as response:
+    data = await response.json()
+    return data['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+
+  async def fetch_video_ids(session, playlist_id):
+   """Step 2: Fetch all video IDs sequentially using nextPageToken (The Bottleneck)."""
    video_ids = []
-   next_page_token = None
+   page_token = ""
+    
    while True:
-    url = "https://www.googleapis.com/youtube/v3/playlistItems"
-    params = {
-        "part": "contentDetails",
-        "playlistId": uploads_playlist_id,
-        "maxResults": 50,
-        "key": API_KEY
-    }
-    if next_page_token:
-     params["pageToken"] = next_page_token
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    data = response.json()
-    for item in data.get("items", []):
-     video_id = item["contentDetails"]["videoId"]
-     video_ids.append(video_id)
-    next_page_token = data.get("nextPageToken")
-    if not next_page_token:
-     break
-   
-   print()
-   print("Total videos found:", len(video_ids))
-   # ============================================================
-   # 3. Get detailed information for videos
-   #
-   # YouTube accepts up to 50 video IDs in one videos.list call.
-   # ============================================================
-   #utilc.maxhourlinkyoutube.videos = []
-   for start in range(0, len(video_ids), 50):
-    batch = video_ids[start:start + 50]
-    url = "https://www.googleapis.com/youtube/v3/videos"
-    params = {
-           "part": "snippet,contentDetails,statistics",
-           "id": ",".join(batch),
-           "key": API_KEY
-       }
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    data = response.json()
-    for item in data.get("items", []):
-     duration_text = item["contentDetails"].get( "duration", "PT0S")
-     duration = isodate.parse_duration(duration_text)
-     duration_seconds = int( duration.total_seconds())
-     utilc.maxhourlinkyoutube.videos.append({
-               #"id": item["id"],
-               "title": item["snippet"]["title"],
-               "duration_seconds": duration_seconds,
-               #"duration_iso": duration_text,
-               #"thumbnail": item["snippet"]["thumbnails"]["high"]["url"],
-               "link": f"https://www.youtube.com/watch?v={item['id']}",
-               "views": item.get("statistics", {}).get("viewCount", "0")
-           })
-   # ============================================================
-   # 4. Sort ALL videos by duration
-   # ============================================================
-   utilc.maxhourlinkyoutube.videos.sort(
-       key=lambda video: video["duration_seconds"],
-       reverse=True
-   )
-   utilc.maxhourlinkyoutube.videos[50:]=[]
+    url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId={playlist_id}&maxResults=50&key={API_KEY}"
+    if page_token:
+     url += f"&pageToken={page_token}"
+            
+    async with session.get(url) as response:
+     data = await response.json()
+     for item in data.get('items', []):
+      video_ids.append(item['contentDetails']['videoId'])
+                
+     page_token = data.get('nextPageToken')
+     if not page_token:
+      break
+                
+   return video_ids
+
+  async def fetch_video_details_chunk(session, chunk):
+   """Worker function to fetch both title AND duration for 50 IDs at once."""
+   ids_string = ",".join(chunk)
+   # Requesting both snippet (title) and contentDetails (duration)
+   url = f"https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id={ids_string}&key={API_KEY}"
+    
+   async with session.get(url) as response:
+    data = await response.json()
+    results = {}
+    for item in data.get('items', []):
+     results[item['id']] = {
+      'title': item['snippet']['title'],
+      'duration': item['contentDetails']['duration']
+     }
+    return results
+
+
+    
+  async with aiohttp.ClientSession() as session:
+   print("1. Fetching Playlist ID...")
+   playlist_id = await get_uploads_playlist_id(session)
+        
+   print("2. Fetching all Video IDs (Sequential - please wait)...")
+   video_ids = await fetch_video_ids(session, playlist_id)
+   print(f"   Found {len(video_ids)} videos.")
+        
+   print("3. Fetching Durations (Fully Asynchronous)...")
+   # Split the 3000 IDs into chunks of 50
+   chunks = [video_ids[i:i + 50] for i in range(0, len(video_ids), 50)]
+        
+   # Create asynchronous tasks to run them all at exactly the same time
+   #tasks = [fetch_durations_chunk(session, chunk) for chunk in chunks]
+   tasks = [fetch_video_details_chunk(session, chunk) for chunk in chunks]
+        
+   # Gather all results simultaneously 
+   results_list = await asyncio.gather(*tasks)
+        
+   # Combine the list of dictionaries into one dictionary
+   #final_video_data = {}
+   for res in results_list:
+    utilc.maxhourlinkyoutube.final_video_data.update(res)
+            
+   #print(f"\nFinished! Total time: {time.time() - start_time:.2f} seconds")
+
   html=''
-  for number, video in enumerate(utilc.maxhourlinkyoutube.videos,start=1):
-   html+=f'<span style="font-size:7pt;font-weight:bold;">{number}.</span> <a href="{video["link"]}">{video["title"]}</a> {video["duration_seconds"]//3600:02d}:{(video["duration_seconds"]%3600)//60:02d}:{video["duration_seconds"]%60:02d} {video["views"]}</br>'
+  for number, (vid, duration) in enumerate(sorted(utilc.maxhourlinkyoutube.final_video_data.items(),key=lambda item: int(isodate.parse_duration(item[1]['duration']).total_seconds()),reverse=True)[:10],start=1):
+   second=int(isodate.parse_duration(duration['duration']).total_seconds())
+   html+=f'<span style="font-size:7pt;font-weight:bold;">{number}.</span> <a href="https://www.youtube.com/watch?v={vid}">{duration['title']}</a> {second//3600:02d}:{(second%3600)//60:02d}:{second%60:02d}</br>'
   return html
