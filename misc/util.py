@@ -163,13 +163,6 @@ class utilc:
 </div>'''
 
  async def maxhourlinkyoutube(self, **kwarg_):
-  if not hasattr(utilc.maxhourlinkyoutube,'videos'):
-   utilc.maxhourlinkyoutube.final_video_data={}
-  if not utilc.maxhourlinkyoutube.final_video_data:
-   API_KEY = os.getenv("YOUTUBE_API_KEY")
-   CHANNEL_ID = 'UChmiKM2jr7e9iUOrVPKRTXQ' # e.g., UC_x5XG1OV2P6uZZ5FSM9Ttw
-   if not API_KEY:
-       raise RuntimeError("YOUTUBE_API_KEY environment variable not found")
 
   async def get_uploads_playlist_id(session):
    """Step 1: Get the hidden 'uploads' playlist ID for the channel."""
@@ -216,35 +209,42 @@ class utilc:
     return results
 
 
+  start_time=time.time()
+  if not hasattr(utilc.maxhourlinkyoutube,'videos'):
+   utilc.maxhourlinkyoutube.final_video_data={}
+  if not utilc.maxhourlinkyoutube.final_video_data:
+   API_KEY = os.getenv("YOUTUBE_API_KEY")
+   CHANNEL_ID = 'UChmiKM2jr7e9iUOrVPKRTXQ' # e.g., UC_x5XG1OV2P6uZZ5FSM9Ttw
+   if not API_KEY:
+       raise RuntimeError("YOUTUBE_API_KEY environment variable not found")
     
-  async with aiohttp.ClientSession() as session:
-   print("1. Fetching Playlist ID...")
-   playlist_id = await get_uploads_playlist_id(session)
-        
-   print("2. Fetching all Video IDs (Sequential - please wait)...")
-   video_ids = await fetch_video_ids(session, playlist_id)
-   print(f"   Found {len(video_ids)} videos.")
-        
-   print("3. Fetching Durations (Fully Asynchronous)...")
-   # Split the 3000 IDs into chunks of 50
-   chunks = [video_ids[i:i + 50] for i in range(0, len(video_ids), 50)]
-        
-   # Create asynchronous tasks to run them all at exactly the same time
-   #tasks = [fetch_durations_chunk(session, chunk) for chunk in chunks]
-   tasks = [fetch_video_details_chunk(session, chunk) for chunk in chunks]
-        
-   # Gather all results simultaneously 
-   results_list = await asyncio.gather(*tasks)
-        
-   # Combine the list of dictionaries into one dictionary
-   #final_video_data = {}
-   for res in results_list:
-    utilc.maxhourlinkyoutube.final_video_data.update(res)
-            
-   #print(f"\nFinished! Total time: {time.time() - start_time:.2f} seconds")
+   async with aiohttp.ClientSession() as session:
+    print("1. Fetching Playlist ID...")
+    playlist_id = await get_uploads_playlist_id(session)
+         
+    print("2. Fetching all Video IDs (Sequential - please wait)...")
+    video_ids = await fetch_video_ids(session, playlist_id)
+    print(f"   Found {len(video_ids)} videos.")
+         
+    print("3. Fetching Durations (Fully Asynchronous)...")
+    # Split the 3000 IDs into chunks of 50
+    chunks = [video_ids[i:i + 50] for i in range(0, len(video_ids), 50)]
+         
+    # Create asynchronous tasks to run them all at exactly the same time
+    #tasks = [fetch_durations_chunk(session, chunk) for chunk in chunks]
+    tasks = [fetch_video_details_chunk(session, chunk) for chunk in chunks]
+         
+    # Gather all results simultaneously 
+    results_list = await asyncio.gather(*tasks)
+         
+    # Combine the list of dictionaries into one dictionary
+    #final_video_data = {}
+    for res in results_list:
+     utilc.maxhourlinkyoutube.final_video_data.update(res)
+             
 
-  html=''
-  for number, (vid, duration) in enumerate(sorted(utilc.maxhourlinkyoutube.final_video_data.items(),key=lambda item: int(isodate.parse_duration(item[1]['duration']).total_seconds()),reverse=True)[:10],start=1):
+  html=f'<pre><b>Finished! Total time: {time.time() - start_time:.2f} seconds</b><br>'
+  for number, (vid, duration) in enumerate(sorted(utilc.maxhourlinkyoutube.final_video_data.items(),key=lambda item: int(isodate.parse_duration(item[1]['duration']).total_seconds()),reverse=True)[:int(kwarg_['request'].args['cmd']) if 'cmd' in kwarg_['request'].args else 50],start=1):
    second=int(isodate.parse_duration(duration['duration']).total_seconds())
    html+=f'<span style="font-size:7pt;font-weight:bold;">{number}.</span> <a href="https://www.youtube.com/watch?v={vid}">{duration['title']}</a> {second//3600:02d}:{(second%3600)//60:02d}:{second%60:02d}</br>'
   return html
